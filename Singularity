@@ -5,7 +5,6 @@ export APT_INSTALL="apt-get install -y --no-install-recommends"
 export DEBIAN_FRONTEND=noninteractive
 export PIP_INSTALL="python3 -m pip --no-cache-dir install --upgrade"
 export MKLROOT=/opt/intel/mkl
-export KENLM_ROOT_DIR=/softs/kenlm
 
 %post
 %%%%%
@@ -13,7 +12,6 @@ export APT_INSTALL="apt-get install -y --no-install-recommends"
 export DEBIAN_FRONTEND=noninteractive
 export PIP_INSTALL="python3 -m pip --no-cache-dir install --upgrade"
 export MKLROOT=/opt/intel/mkl
-export KENLM_ROOT_DIR=/softs/kenlm
 
 apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install gcc g++ gfortran wget cpio && \
   cd /tmp && \
@@ -30,6 +28,8 @@ apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install gcc g++ gfor
   echo "/opt/intel/mkl/lib/intel64" >> /etc/ld.so.conf.d/intel.conf && \
   ldconfig && \
   echo "source /opt/intel/mkl/bin/mklvars.sh intel64" >> /etc/bash.bashrc
+  
+apt-get install xmlstarlet
 
 %runscript
 exec /bin/bash "$@"

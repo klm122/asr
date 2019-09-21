@@ -75,8 +75,7 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* /tmp/*
 
-RUN mkdir ~/wav2letter \
-    cd ~/wav2letter \
+RUN cd ~ \
     git clone https://github.com/facebookresearch/wav2letter.git \
     cd -
 

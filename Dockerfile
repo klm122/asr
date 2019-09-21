@@ -75,11 +75,10 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* /tmp/*
 
-RUN mkdir ~/wav2letter
-
-cd ~/wav2letter
-git clone https://github.com/facebookresearch/wav2letter.git
-cd -
+RUN mkdir ~/wav2letter \
+    cd ~/wav2letter \
+    git clone https://github.com/facebookresearch/wav2letter.git \
+    cd -
 
 # ==================================================================
 # flashlight https://github.com/facebookresearch/flashlight.git

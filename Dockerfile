@@ -62,7 +62,7 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
 # ==================================================================
 # KenLM https://github.com/kpu/kenlm
 # ------------------------------------------------------------------
-    cd /root && git clone https://github.com/kpu/kenlm.git && \
+     cd ~ && git clone https://github.com/kpu/kenlm.git && \
     cd kenlm && git checkout e47088ddfae810a5ee4c8a9923b5f8071bed1ae8 && \
     mkdir build && cd build && \
     cmake .. && \
@@ -78,7 +78,7 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     git clone https://github.com/facebookresearch/wav2letter.git \
     cd - \
     export MKLROOT=/opt/intel/mkl && \
-    cd /root && git clone --recursive https://github.com/facebookresearch/flashlight.git && \
+     cd ~ && git clone --recursive https://github.com/facebookresearch/flashlight.git && \
     cd flashlight && mkdir -p build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release -DFLASHLIGHT_BACKEND=CPU && \
     make -j8 && make install && \

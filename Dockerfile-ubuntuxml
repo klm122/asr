@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM python:latest
 MAINTAINER Arun Gupta <arungupta@redhat.com>
 
 # Execute system update

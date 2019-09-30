@@ -1,4 +1,4 @@
-FROM FROM ubuntu
+FROM ubuntu:14.04
 
 # Execute system update
 RUN apt-get update

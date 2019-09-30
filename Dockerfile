@@ -1,4 +1,4 @@
-FROM ubuntu:14.04
+FROM nitincypher/docker-ubuntu-python-pip
 
 # Execute system update
 RUN apt-get update

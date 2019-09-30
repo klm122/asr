@@ -1,4 +1,4 @@
-FROM FROM python:latest
+FROM FROM ubuntu
 
 # Execute system update
 RUN apt-get update

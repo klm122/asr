@@ -1,35 +1,40 @@
-# Use Caffe2 image as parent image
-FROM caffe2/caffe2:snapshot-py2-cuda9.0-cudnn7-ubuntu16.04
+FROM debian:9.8
+LABEL maintainer="mdoulaty@gmail.com"
 
-RUN mv /usr/local/caffe2 /usr/local/caffe2_build
-ENV Caffe2_DIR /usr/local/caffe2_build
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        g++ \
+        make \
+        automake \
+        autoconf \
+        bzip2 \
+        unzip \
+        wget \
+        sox \
+        libtool \
+        git \
+        subversion \
+        python2.7 \
+        python3 \
+        zlib1g-dev \
+        ca-certificates \
+        gfortran \
+        patch \
+        ffmpeg \
+        xmlstarlet \
+	vim && \
+    rm -rf /var/lib/apt/lists/*
 
-ENV PYTHONPATH /usr/local/caffe2_build:${PYTHONPATH}
-ENV LD_LIBRARY_PATH /usr/local/caffe2_build/lib:${LD_LIBRARY_PATH}
+RUN ln -s /usr/bin/python2.7 /usr/bin/python 
 
-# Clone the Detectron repository
-RUN git clone https://github.com/facebookresearch/densepose /densepose
+RUN git clone --depth 1 https://github.com/kaldi-asr/kaldi.git /opt/kaldi && \
+    cd /opt/kaldi && \
+    cd /opt/kaldi/tools && \
+    ./extras/install_mkl.sh && \
+    make -j $(nproc) && \
+    cd /opt/kaldi/src && \
+    ./configure --shared && \
+    make depend -j $(nproc) && \
+    make -j $(nproc)
 
-# Install Python dependencies
-RUN pip install -r /densepose/requirements.txt
-
-# Install the COCO API
-RUN git clone https://github.com/cocodataset/cocoapi.git /cocoapi
-WORKDIR /cocoapi/PythonAPI
-RUN make install
-
-# Go to Densepose root
-WORKDIR /densepose
-
-# Set up Python modules
-RUN make
-
-# [Optional] Build custom ops
-RUN make ops
-
-#FROM nitincypher/docker-ubuntu-python-pip
-
-# Execute system update
-#RUN apt-get update
-# Install packages necessary to run EAP
-#RUN apt-get -y install xmlstarlet
+WORKDIR /opt/kaldi/

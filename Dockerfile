@@ -1,7 +1,6 @@
 FROM ubuntu:16.04
 RUN mkdir -p /opt/android-sdk-linux && mkdir -p ~/.android && touch ~/.android/repositories.cfg
 ENV WORKING_DIR /opt
-
 ENV ANDROID_NDK_HOME ${WORKING_DIR}/android-ndk-linux
 ENV ANDROID_TOOLCHAIN_PATH /opt/my-android-toolchain
 ENV PATH ${ANDROID_TOOLCHAIN_PATH}/bin:${PATH}

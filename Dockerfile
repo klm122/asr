@@ -10,7 +10,7 @@ RUN apt-get install -y git wget make gcc python python-pip build-essential curl 
 		 cmake libreadline-dev git-core libqt4-dev libjpeg-dev \
 		 libpng-dev ncurses-dev imagemagick libzmq3-dev gfortran \
 		 unzip gnuplot gnuplot-x11 sudo vim libopencv-dev google-perftools \
-		 libgoogle-perftools-dev ffmpeg
+		 libgoogle-perftools-dev ffmpeg atlas3-sse2-dev lapack3-dev refblas3-dev
 RUN apt-get install -y --no-install-recommends libhdf5-serial-dev liblmdb-dev
 
 

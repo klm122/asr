@@ -1,75 +1,228 @@
-FROM                java:openjdk-8-jre
+# Need devel version cause we need /usr/include/cudnn.h 
+# for compiling libctc_decoder_with_kenlm.so
+FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04
 
-MAINTAINER          Ismar Slomic <ismar.slomic@accenture.com>
 
-# Install dependencies, download and extract Bitbucket Server and create the required directory layout.
-# Try to limit the number of RUN instructions to minimise the number of layers that will need to be created.
-RUN apt-get update -qq \
-    && apt-get install -y --no-install-recommends git libtcnative-1 xmlstarlet vim \
-    && apt-get clean autoclean \
-    && apt-get autoremove --yes \
-    && rm -rf /var/lib/{apt,dpkg,cache,log}/
+# >> START Install base software
 
-# Data directory for Bitbucket Server
-# https://confluence.atlassian.com/bitbucketserver/bitbucket-server-home-directory-776640890.html
-ENV BITBUCKET_HOME          /var/atlassian/application-data/bitbucket
+# Get basic packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        wget \
+        git \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-wheel \
+        python3-numpy \
+        libcurl3-dev  \
+        ca-certificates \
+        gcc \
+        sox \
+        libsox-fmt-mp3 \
+        htop \
+        nano \
+        swig \
+        cmake \
+        libboost-all-dev \
+        zlib1g-dev \
+        libbz2-dev \
+        liblzma-dev \
+        locales \
+        pkg-config \
+        libpng-dev \
+        libsox-dev \
+        libmagic-dev \
+        libgsm1-dev \
+        libltdl-dev \
+        openjdk-8-jdk \
+        bash-completion \
+        g++ \
+        unzip
 
-# Install Atlassian Bitbucket Server to the following location
-ENV BITBUCKET_INSTALL_DIR   /opt/atlassian/bitbucket
+RUN ln -s -f /usr/bin/python3 /usr/bin/python
 
-ENV BITBUCKET_VERSION       4.8.3
-ENV DOWNLOAD_URL            https://downloads.atlassian.com/software/stash/downloads/atlassian-bitbucket-${BITBUCKET_VERSION}.tar.gz
+# Install NCCL 2.2
+RUN apt-get install -qq -y --allow-downgrades --allow-change-held-packages libnccl2=2.3.7-1+cuda10.0 libnccl-dev=2.3.7-1+cuda10.0
 
-# Create Bitbucket Server application user, can be overwritten by providing -u option in docker run
-# https://docs.docker.com/engine/reference/run/#/user
-ARG user=bitbucket
-ARG group=bitbucket
-ARG uid=1000
-ARG gid=1000
+# Install Bazel
+RUN curl -LO "https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel_0.24.1-linux-x86_64.deb"
+RUN dpkg -i bazel_*.deb
 
-# Bitbucket Server is running with user `bitbucket`, uid = 1000
-# If you bind mount a volume from the host or a data container,
-# ensure you use the same uid
-RUN mkdir -p $(dirname $BITBUCKET_HOME) \
-    && groupadd -g ${gid} ${group} \
-    && useradd -d "$BITBUCKET_HOME" -u ${uid} -g ${gid} -m -s /bin/bash ${user}
+# Install CUDA CLI Tools
+RUN apt-get install -qq -y cuda-command-line-tools-10-0
 
-RUN mkdir -p                                ${BITBUCKET_HOME} \
-    && mkdir -p                             ${BITBUCKET_HOME}/caches/indexes \
-    && chmod -R 700                         ${BITBUCKET_HOME} \
-    && chown -R ${user}:${group}            ${BITBUCKET_HOME} \
-    && mkdir -p                             ${BITBUCKET_INSTALL_DIR}/conf/Catalina \
-    && curl -L --silent                     ${DOWNLOAD_URL} | tar -xz --strip=1 -C "$BITBUCKET_INSTALL_DIR" \
-    && chmod -R 700                         ${BITBUCKET_INSTALL_DIR}/conf \
-    && chmod -R 700                         ${BITBUCKET_INSTALL_DIR}/logs \
-    && chmod -R 700                         ${BITBUCKET_INSTALL_DIR}/temp \
-    && chmod -R 700                         ${BITBUCKET_INSTALL_DIR}/work \
-    && chown -R ${user}:${group}            ${BITBUCKET_INSTALL_DIR}/conf \
-    && chown -R ${user}:${group}            ${BITBUCKET_INSTALL_DIR}/logs \
-    && chown -R ${user}:${group}            ${BITBUCKET_INSTALL_DIR}/temp \
-    && chown -R ${user}:${group}            ${BITBUCKET_INSTALL_DIR}/work \
-    && ln --symbolic                        "/usr/lib/x86_64-linux-gnu/libtcnative-1.so" "${BITBUCKET_INSTALL_DIR}/lib/native/libtcnative-1.so" \
-    && perl -i -p -e 's/^# umask 0027/umask 0027/'  ${BITBUCKET_INSTALL_DIR}/bin/setenv.sh
+# Install pip
+RUN wget https://bootstrap.pypa.io/get-pip.py && \
+    python3 get-pip.py && \
+    rm get-pip.py
 
-COPY        docker-entrypoint.sh /
-ENTRYPOINT  ["/docker-entrypoint.sh"]
-RUN         chmod +x /docker-entrypoint.sh
+# << END Install base software
 
-USER        ${user}:${group}
 
-# HTTP Port
-EXPOSE      7990
 
-# SSH Port
-EXPOSE      7999
 
-# Set volume mount points for installation and home directory. Changes to the
-# home directory needs to be persisted
-VOLUME      ["${BITBUCKET_HOME}"]
+# >> START Configure Tensorflow Build
 
-# Set the default working directory as the installation directory.
-WORKDIR     $BITBUCKET_INSTALL_DIR
+# Clone TensoFlow from Mozilla repo
+RUN git clone https://github.com/mozilla/tensorflow/
+WORKDIR /tensorflow
+RUN git checkout r1.15
 
-# Run Atlassian Bitbucket Server as a foreground process by default.
-# https://confluence.atlassian.com/bitbucketserver/starting-and-stopping-bitbucket-server-776640144.html
-CMD         ["bin/start-bitbucket.sh", "-fg"]
+
+# GPU Environment Setup
+ENV TF_NEED_CUDA 1
+ENV TF_CUDA_PATHS "/usr/local/cuda,/usr/lib/x86_64-linux-gnu/"
+ENV TF_CUDA_VERSION 10.0
+ENV TF_CUDNN_VERSION 7
+ENV TF_CUDA_COMPUTE_CAPABILITIES 6.0
+ENV TF_NCCL_VERSION 2.3
+
+# Common Environment Setup
+ENV TF_BUILD_CONTAINER_TYPE GPU
+ENV TF_BUILD_OPTIONS OPT
+ENV TF_BUILD_DISABLE_GCP 1
+ENV TF_BUILD_ENABLE_XLA 0
+ENV TF_BUILD_PYTHON_VERSION PYTHON3
+ENV TF_BUILD_IS_OPT OPT
+ENV TF_BUILD_IS_PIP PIP
+
+# Other Parameters
+ENV CC_OPT_FLAGS -mavx -mavx2 -msse4.1 -msse4.2 -mfma
+ENV TF_NEED_GCP 0
+ENV TF_NEED_HDFS 0
+ENV TF_NEED_JEMALLOC 1
+ENV TF_NEED_OPENCL 0
+ENV TF_CUDA_CLANG 0
+ENV TF_NEED_MKL 0
+ENV TF_ENABLE_XLA 0
+ENV TF_NEED_AWS 0
+ENV TF_NEED_KAFKA 0
+ENV TF_NEED_NGRAPH 0
+ENV TF_DOWNLOAD_CLANG 0
+ENV TF_NEED_TENSORRT 0
+ENV TF_NEED_GDR 0
+ENV TF_NEED_VERBS 0
+ENV TF_NEED_OPENCL_SYCL 0
+ENV PYTHON_BIN_PATH /usr/bin/python3.6
+ENV PYTHON_LIB_PATH /usr/lib/python3.6/dist-packages
+
+# << END Configure Tensorflow Build
+
+
+
+
+# >> START Configure Bazel
+
+# Running bazel inside a `docker build` command causes trouble, cf:
+#   https://github.com/bazelbuild/bazel/issues/134
+# The easiest solution is to set up a bazelrc file forcing --batch.
+RUN echo "startup --batch" >>/etc/bazel.bazelrc
+# Similarly, we need to workaround sandboxing issues:
+#   https://github.com/bazelbuild/bazel/issues/418
+RUN echo "build --spawn_strategy=standalone --genrule_strategy=standalone" \
+    >>/etc/bazel.bazelrc
+
+# Put cuda libraries to where they are expected to be
+RUN mkdir /usr/local/cuda/lib &&  \
+    ln -s /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/local/cuda/lib/libnccl.so.2 && \
+    ln -s /usr/include/nccl.h /usr/local/cuda/include/nccl.h && \
+    ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
+    ln -s /usr/include/cudnn.h /usr/local/cuda/include/cudnn.h
+
+
+# Set library paths
+ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu/:/usr/local/cuda/lib64/stubs/
+
+# << END Configure Bazel
+
+
+# Copy DeepSpeech repo contents to container's /DeepSpeech
+COPY . /DeepSpeech/
+
+# Alternative clone from GitHub 
+# RUN apt-get update && apt-get install -y git-lfs 
+# WORKDIR /
+# RUN git lfs install
+# RUN git clone https://github.com/mozilla/DeepSpeech.git
+
+WORKDIR /DeepSpeech
+
+RUN pip3 --no-cache-dir install -r requirements.txt
+
+# Link DeepSpeech native_client libs to tf folder
+RUN ln -s /DeepSpeech/native_client /tensorflow
+
+
+
+
+# >> START Build and bind
+
+WORKDIR /tensorflow
+
+# Fix for not found script https://github.com/tensorflow/tensorflow/issues/471
+RUN ./configure
+
+# Using CPU optimizations:
+# -mtune=generic -march=x86-64 -msse -msse2 -msse3 -msse4.1 -msse4.2 -mavx.
+# Adding --config=cuda flag to build using CUDA.
+
+# passing LD_LIBRARY_PATH is required cause Bazel doesn't pickup it from environment
+
+
+# Build DeepSpeech
+RUN bazel build --workspace_status_command="bash native_client/bazel_workspace_status_cmd.sh" --config=monolithic --config=cuda -c opt --copt=-O3 --copt="-D_GLIBCXX_USE_CXX11_ABI=0" --copt=-mtune=generic --copt=-march=x86-64 --copt=-msse --copt=-msse2 --copt=-msse3 --copt=-msse4.1 --copt=-msse4.2 --copt=-mavx --copt=-fvisibility=hidden //native_client:libdeepspeech.so //native_client:generate_trie --verbose_failures --action_env=LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+
+###
+### Using TensorFlow upstream should work
+###
+# # Build TF pip package
+# RUN bazel build --config=opt --config=cuda --copt="-D_GLIBCXX_USE_CXX11_ABI=0" --copt=-mtune=generic --copt=-march=x86-64 --copt=-msse --copt=-msse2 --copt=-msse3 --copt=-msse4.1 --copt=-msse4.2 --copt=-mavx //tensorflow/tools/pip_package:build_pip_package --verbose_failures --action_env=LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+#
+# # Build wheel
+# RUN bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg
+#
+# # Install tensorflow from our custom wheel
+# RUN pip3 install /tmp/tensorflow_pkg/*.whl
+
+# Copy built libs to /DeepSpeech/native_client
+RUN cp /tensorflow/bazel-bin/native_client/generate_trie /DeepSpeech/native_client/ \
+    && cp /tensorflow/bazel-bin/native_client/libdeepspeech.so /DeepSpeech/native_client/
+
+# Install TensorFlow
+WORKDIR /DeepSpeech/
+RUN pip3 install tensorflow-gpu==1.15.0
+
+
+# Make DeepSpeech and install Python bindings
+ENV TFDIR /tensorflow
+WORKDIR /DeepSpeech/native_client
+RUN make deepspeech
+WORKDIR /DeepSpeech/native_client/python
+RUN make bindings
+RUN pip3 install dist/deepspeech*
+WORKDIR /DeepSpeech/native_client/ctcdecode
+RUN make
+RUN pip3 install dist/*.whl
+
+
+# << END Build and bind
+
+
+
+
+# Allow Python printing utf-8
+ENV PYTHONIOENCODING UTF-8
+
+# Build KenLM in /DeepSpeech/native_client/kenlm folder
+WORKDIR /DeepSpeech/native_client
+RUN rm -rf kenlm \
+    && git clone --depth 1 https://github.com/kpu/kenlm && cd kenlm \
+    && mkdir -p build \
+    && cd build \
+    && cmake .. \
+    && make -j 4
+
+# Done
+WORKDIR /DeepSpeech
